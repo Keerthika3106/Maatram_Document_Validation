@@ -1,0 +1,202 @@
+o
+    i7k4>  ã                   @   sø  d Z ddlZddlZddlZddlZddlmZ ddl mZm	Z	m
+Z
+m
+Z
+ ddlm
+Z
+ ddlmZ dd lmZmZmZ ddlmZ dd	lmZmZ eeƒZe
+ed
+d
+g d¢iid
+ h d£Zh d£Zdedefdd„Zejddgddd„ ƒZ ejddgddd„ ƒZ!dedede"fdd„Z#d e$d!e%de%fd"d#„Z&dAd%ed&e$fd'd(„Z'ejd)d*gddefd+d,„ƒZ(ejd-d*gdd.d/„ ƒZ)d0hZ*d1Z+ejd2dgdd3d4„ ƒZ,h d5£Z-ejd6dgdd7d8„ ƒZ.ejd9d*gddefd:d;„ƒZ/ed<krúej0d=d>d?d@ dS dS )Bay  
+Maatram Foundation - Backend API
+=================================
+Endpoints:
+  POST /api/photo/validate                   Individual photo validation
+  POST /api/photo/group/validate             Group photo validation (spreadsheet)
+  GET  /api/photo/group/results/<filename>   Download validated spreadsheet
+  POST /api/document/individual/verify       Individual document (marksheet) verification
+  POST /api/document/group/verify            Group document (bulk marksheet) verification
+  GET  /api/document/group/report/<filename> Download bulk verification Excel report
+  GET  /api/health                           Health check
+é    N)ÚPath)ÚFlaskÚ requestÚ jsonifyÚ	send_file)ÚCORS)Úvalidate_photo)Úprocess_spreadsheetÚ
+MODEL_PATHÚ
+OUTPUT_FOLDER)Úrun_individual_doc_verification)Úrun_bulk_doc_verificationÚ
+REPORT_FOLDERz/api/*Z origins)zhttp://localhost:5173zhttp://127.0.0.1:5173zhttp://localhost:4173zhttp://localhost:3000)Z	resources>   ZjpegZjpgZpng>   ÚcsvÚxlsmÚxlsxÚfilenameÚreturnc                 C   s    d| v r|   dd¡d  ¡ S dS )NÚ.é   éÿÿÿÿÚ )ÚrsplitÚlower)r   © r   úYC:\Users\Keerthika  V\Frontend_with_Ind_Group_Photo_val\maatram-foundation\backend\app.pyÚ_ext*   s    r   z/api/photo/validateZPOST)Ú methodsc               
+   C   s  dt jvr
+tddiƒdfS t jd } | jstddiƒdfS t| jƒtvr1tdd| j› d iƒdfS |  ¡ }|s?tdd	iƒdfS zt || jƒ}W n: tyc } ztdt	|ƒiƒd
+fW  Y d }~S d }~w t
+y } ztdd
+t	|ƒ› iƒdfW  Y d }~S d }~ww t|ƒd
+fS )NÚfileÚerrorz+No file uploaded. Send the image as 'file'.é  úNo file selected.úUnsupported format 'z''. Only JPG, JPEG and PNG are accepted.éŸ  úUploaded file is empty.é÷  zValidation error: éô  éÈ   )
+r   Úfilesr   r   r   ÚALLOWED_IMAGE_EXTENSIONSÚreadr   ÚFileNotFoundErrorÚstrÚ	Exception)r   Z
+file_bytesÚresultÚexcr   r   r   Úphoto_validate1   s0   
+
+ÿþ €&€ÿr0   z/api/photo/group/validatec                  C   s  dt jvr
+tddiƒdfS t jd } | jstddiƒdfS t| jƒ}|tvr3tdd| j› d iƒdfS tj  t	¡sAtdd	iƒd
+fS d
+|› }t
+j
+|dd
+}|j}z|  
+|¡ | ¡  z	t|ƒ\}}} W n\ ty } z!tdt|ƒiƒdfW  Y d }~W z t |¡ W S  ty‹   Y S w d }~w ty¿ } z$tddt|ƒ› iƒdfW  Y d }~W z t |¡ W S  tyº   Y S w d }~ww W z t |¡ W n tyÑ   Y nw z t |¡ W w  tyâ   Y w w t||ƒ}	||  }
+t|ƒj}
+t|dd t|| |
+|	|
+dœƒdfS )Nr   r   z1No spreadsheet uploaded. Send the file as 'file'.r    r!   r"   z('. Only CSV, XLSX and XLSM are accepted.r#   zVYuNet model not found. Place face_detection_yunet_2023mar.onnx in the backend/ folder.r%   r   F©ÚsuffixÚdeleteé¦  zProcessing error: r&   éX  ©Údelay)ÚpassedÚfailedÚtotalÚrowsÚoutput_filenamer'   )r   r(   r   r   r   ÚALLOWED_SPREADSHEET_EXTENSIONSÚosÚpathÚexistsr
+   ÚtempfileÚNamedTemporaryFileÚnameÚsaveÚcloser	   Ú
+ValueErrorr,   ÚremoveÚ OSErrorr-   Ú_read_output_rowsr   Ú_schedule_cleanup)r   Úextr2   ÚtmpÚtmp_pathÚ
+output_pathr8   r9   r/   r;   r:   r<   r   r   r   Úgroup_photo_validateP   s†   
+
+
+ÿþÿþ
+
+ ÿ€ù&ÿ€ùýÿþÿ
+
+ûúrO   rN   rK   c                 C   s  ddl }ddlm} g }|dkrCt| ddd d!}| |¡}t|d	d
+D ]\} }| t | |ƒ¡ q$W d  ƒ |S 1 s<w   Y  |S || d
+d}	|	j}
+d
+d„ t	|
+j
+d	d	dƒD ƒ}
+t|
+j
+dd
+dd	d
+D ]\} }dd„ t
+|
+|ƒD ƒ}
+| t | |
+ƒ¡ qe|	 ¡  |S )zµ
+    Read the validated output file produced by process_spreadsheet() and
+    return a list of row dicts for the frontend table.
+    Keys: id, name, photo_link, status, details
+    r   N)Ú
+load_workbookr   Úrr   z	utf-8-sig)Ú newlineÚencodingr   ©ÚstartT)Z	read_onlyc                 S   s   g | ]}|j ‘qS r   )Úvalue)Ú.0Zcellr   r   r   Ú
+<listcomp>¥   s    z%_read_output_rows.<locals>.<listcomp>)Ú min_rowZ max_rowé   )rY   Z
+values_onlyc                 S   s*   i | ]\}}t |ƒ|d urt |ƒnd“qS )Nr   )r,   )rW   ÚhÚvr   r   r   Ú
+<dictcomp>§   s   * z%_read_output_rows.<locals>.<dictcomp>)
+r   ZopenpyxlrP   ÚopenZ
+DictReaderÚ	enumerateÚappendÚ_make_table_rowZactiveÚnextZ	iter_rowsÚziprE   )rN   rK   Z csv_modZlwr;   ÚfÚreaderÚiÚrowÚwbZwsZ headersZ	excel_rowZrow_dictr   r   r   rI   ‘   s*   
+ÿ
+þòørI   Úindexrg   c                    sž   ddl ‰ dtdtdtf‡ fdd „}||g d¢ƒ}||g d	¢ƒ}||d
+gƒ}||d
+gƒ}| ¡ dkr3d
+nd} | d
+kr=|s=d}t| ƒ d¡|pId| › || |dœS )zFNormalize a spreadsheet row into the shape the frontend table expects.r   NÚdÚkeysr   c                     s^   ‡ fdd„|   ¡ D ƒ}|D ]}ˆ  dd| ¡ ¡}||v r,|| r(t|| ƒ  S d  S q
+dS )Nc                    s(   i | ]\}}ˆ   d dt|ƒ ¡ ¡|“qS )ú	[^a-z0-9]r   )Úsubr,   r   )rW   Úkr\   ©Zre_modr   r   r]   ³   s   ( z2_make_table_row.<locals>._find.<locals>.<dictcomp>rl   r   )Úitemsrm   r   r,   )rj   rk   Znormrn   Úkeyro   r   r   Ú_find²   s    ÿz_make_table_row.<locals>._find)ZNamez	Full NamezCandidate NameúStudent Name)z
+Photo Linkz	Photo URLz
+Image Linkz	Image URLZPhotoZLinkzValidation StatuszFailure ReasonZPASSZpassZfailzAll validation checks passed.é   zRow )ÚidrC   Ú
+photo_linkÚstatusÚ details)ZreÚdictÚlistr,   ÚupperÚzfill)ri   rg   rr   rC   rv   Z
+status_rawrx   rw   r   ro   r   ra   ®   s   ûra   r5   r?   r7   c                    s(   ‡ ‡fdd„}t j|dd}| ¡  dS )zDDelete the output file after `delay` seconds in a background thread.c                      s0   t  ˆ ¡ zt ˆ¡ W d S  ty   Y d S w )N)ÚtimeÚsleepr>   rG   rH   r   ©r7   r?   r   r   Ú _deleteÎ   s   
+ÿz"_schedule_cleanup.<locals>._deleteT)ÚtargetZdaemonN)Ú	threadingZThreadrU   )r?   r7   r€   Útr   r   r   rJ   Ì   s   rJ   z#/api/photo/group/results/<filename>ZGETc                 C   sd   t | ƒj}tj t|¡}tj |¡st ddiƒdfS t|ƒ}dddd œ}| 	|d¡}t
+||d	|d
+S )
+Nr   z,Result file not found or already cleaned up.é”  ztext/csvúAapplication/vnd.openxmlformats-officedocument.spreadsheetml.sheetz.application/vnd.ms-excel.sheet.macroenabled.12)r   r   r   zapplication/octet-streamT©ZmimetypeZ
+as_attachmentZ
+download_name)
+r   rC   r>   r?   Újoinr
+   Úisfiler   r   Úgetr   )r   Ú	safe_nameÚ	file_pathrK   Zmime_mapZmimer   r   r   Údownload_group_resultsÛ   s    
+ýürŒ   z
+/api/healthc                  C   s(   t j t¡} td| rddœƒS ddœƒS )NZokZ presentÚ MISSING)rw   Z
+yunet_model)r>   r?   r@   r
+   r   )Z
+model_presentr   r   r   Úhealth÷   s   þþrŽ   Zpdfi    z/api/document/individual/verifyc            
+   
+   C   sî  dt jvr
+tddiƒdfS t jd } | jstddiƒdfS t| jƒ}|tvr3tdd| j› d iƒdfS |  ¡ }|sAtdd	iƒdfS t |ƒtkrOtdd
+iƒd
+fS dd l	}g }t j
+ 
+d
+d¡}|r£z9| |¡}t
+|tƒr–|D ]*} t|  
+dd¡ƒ ¡ }t|  
+d|  
+dd¡¡ƒ ¡ }	|r•|	 ¡ r•| |t|	ƒdœ¡ qkW n
+ ttfy¢   Y nw z
+t|| j|d}
+W n tyÌ }
+ ztddt|
+ƒ› iƒdfW  Y d }
+~
+S d }
+~
+ww d|
+v rñ|
+ 
+dd¡}|dv rát|
+ƒdfS |dv rët|
+ƒdfS t|
+ƒdfS t|
+ƒdfS )Nr   r   z)No file uploaded. Send the PDF as 'file'.r    r!   r"   z'. Only PDF files are accepted.r#   r$   z1File is too large. Maximum allowed size is 10 MB.i  r   Úentered_subjectsr   Ú subjectZmarksÚmark)r   r‘   )Ú	pdf_bytesr   r   zVerification engine error: r&   Ústep)Ztesseract_checkr%   )Zuploaded_extractionr4   r'   )r   r(   r   r   r   ÚALLOWED_DOC_EXTENSIONSr*   ÚlenÚMAX_DOC_SIZE_BYTESZjsonZformr‰   ÚloadsÚ
+isinstancerz   r,   ÚstripÚ isdigitr`   ÚintrF   Ú	TypeErrorr   r-   )
+r   rK   r’   Z_jsonr   Z
+raw_enteredZparsedÚitemZsubjZmark_rawr.   r/   r“   r   r   r   Úindividual_doc_verify  sl   
+
+
+ÿþ
+
+þ€ÿ
+ý&€ÿrž   >   r   r   Zxlsz/api/document/group/verifyc                  C   s,  dd l } dtjvrtddiƒdfS tjd }|js!tddiƒdfS t|jƒ}|tvr7tdd |j› diƒd	fS d
+|› }t j|d
+d}|j	}|  
+¡ j
+}z!| |¡ | 
+¡  t||d
+} W z t |¡ W n tyl   Y nw z t |¡ W w  ty}   Y w w d| v rŒtd| d iƒdfS g }t|  dg ¡ddD ]7\}	}
+| t|	ƒ d¡|
+ dd¡|
+ dd¡|
+ dd¡|
+ dd¡t|
+ dd¡ƒt|
+ dd¡ƒ|
+ dd¡dœ¡ q˜i }
+|  dg ¡D ]}| dd¡}
+|
+|
+vrèg |
+|
+< |
+|
+  |¡ qØ|  d¡rýt| d d d! t| d" | d# | d$ | d% ||
+|  d&¡d'œ ƒd(fS ))Nr   r   r   z1No file uploaded. Send the spreadsheet as 'file'.r    r!   r"   z.'. Only CSV, XLSX, and XLS files are accepted.r#   r   Fr1   )Ú
+session_idr%   Zsummary_rowsr   rT   rt   rs   r   zCertificate TypezUploaded vs Enteredz
+NOT CHECKEDZ
+OriginalityZ
+UNVERIFIEDzUploaded TotalzOfficial TotalzStatus / Error)ru   rC   Zcertificate_typeZuploaded_vs_enteredZ
+originalityZuploaded_totalZofficial_totalZstatus_errorZ
+detail_rowsZ
+report_pathi   r6   r:   ÚoriginalÚpossible_forgeryÚ
+unverifiedÚreport_filename) r:   r    r¡   r¢   r;   Ú
+detail_mapr£   r'   )Zuuidr   r(   r   r   r   ÚALLOWED_SHEET_EXTENSIONSrA   rB   rC   Zuuid4ÚhexrD   rE   r
+   r>   rG   rH   r_   r‰   r`   r,   r|   rJ   )Z_uuidr   rK   r2   rL   rM   rŸ   r.   Zstudent_rowsrf   rg   r¤   r   rC   r   r   r   Úgroup_doc_verifyQ  s‚   
+
+
+þû
+
+
+ÿþÿ
+
+
+
+
+
+ø
+ùør§   z%/api/document/group/report/<filename>c                 C   sH   t | ƒj}tj ttƒ|¡}tj  |¡stddiƒdfS t	|dd|dS ) Nr   z,Report file not found or already cleaned up.r„   r…   Tr†   )
+r   rC   r>   r?   r‡   r,   r   rˆ   r   r   )r   rŠ   r‹   r   r   r   Údownload_group_doc_report¦  s   
+ür¨   Ú__main__z 0.0.0.0iˆ  T)ZhostZportÚdebug)r5   )1Ú __doc__r>   rA   r‚   r}   Z pathlibr   Zflaskr   r   r   r   Z
+flask_corsr    Zphoto_validatorr   Zbulk_photo_validatorr	   r
+   r
+   Z
+doc_validatorr   Zbulk_doc_validatorr
+   r   Ú__name__Úappr)   r=   r,   r   Zrouter0   rO   rz   rI   r›   ry   ra   rJ   rŒ   rŽ   r”   r–   rž   r¥   r§   r¨   Úrunr   r   r   r   Ú<module>   sP    
+  
+
+@
+
+E
+Tÿ
