@@ -1,0 +1,12 @@
+flask
+flask-cors
+pillow
+opencv-contrib-python
+numpy
+gdown
+requests
+openpyxl
+pymupdf
+pytesseract
+tabulate
+pandas
